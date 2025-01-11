@@ -2,7 +2,6 @@ import os
 import subprocess
 import json
 import logging
-from tabulate import tabulate
 from colorama import Fore, Style
 from rich.console import Console
 from rich.table import Table
@@ -62,34 +61,44 @@ def show_message(message, message_type="info"):
     elif message_type == "success":
         console.print(Panel(f"[green]{message}[/green]", title="[bold blue]Success[/bold blue]"))
 
-# Set up a tunnel based on the specified type
-def setup_tunnel(server, local_tunnel):
-    tunnel_type = server["tunnel_type"]
-    remote_ip = server["remote_ip"]
-    local_ip = input("Enter the local IP for this server: ").strip()
+# Configure tunnel interactively
+def setup_tunnel_interactive(servers):
+    """
+    پیکربندی تونل از طریق منو و تعامل با کاربر
+    """
+    print("\nAvailable Servers:")
+    for i, server in enumerate(servers, start=1):
+        print(f"{i}. {server['name']} ({server['tunnel_type']})")
     
-    try:
-        if tunnel_type == "6TO4":
-            os.system(f"sudo ip tunnel add {local_tunnel} mode sit remote {remote_ip} ttl 255")
-        elif tunnel_type == "GRE6":
-            os.system(f"sudo ip tunnel add {local_tunnel} mode gre remote {remote_ip} local {local_ip} ttl 255")
-        elif tunnel_type == "IP6IP6":
-            os.system(f"sudo ip tunnel add {local_tunnel} mode ip6ip6 remote {remote_ip} ttl 255")
-        elif tunnel_type == "ANYCAST":
-            print("ANYCAST tunnel setup is not fully implemented yet.")
-        else:
-            print(f"Unsupported tunnel type: {tunnel_type}")
-            return
-
-        # تنظیم IP برای اینترفیس تونل
-        os.system(f"sudo ip addr add {local_ip}/30 dev {local_tunnel}")
-        os.system(f"sudo ip link set {local_tunnel} up")
+    # انتخاب سرور
+    server_choice = int(input("\nSelect a server: ")) - 1
+    if server_choice < 0 or server_choice >= len(servers):
+        show_message("Invalid choice!", "error")
+        return
+    
+    selected_server = servers[server_choice]
+    tunnel_type = selected_server["tunnel_type"]
+    
+    # دریافت اطلاعات برای GRE6
+    if tunnel_type == "GRE6":
+        local_ip = input("Enter the local IP for this server: ").strip()
+        remote_ip = input("Enter the remote IP (target server): ").strip()
+        tunnel_name = input("Enter a name for the tunnel interface: ").strip()
         
-        show_message(f"Tunnel {local_tunnel} configured for server {server['name']} with local IP {local_ip}.", "success")
-        logging.info(f"Tunnel {local_tunnel} configured for server {server['name']} with local IP {local_ip}.")
-    except Exception as e:
-        logging.error(f"Failed to configure tunnel: {e}")
-        show_message(f"Error: {e}", "error")
+        try:
+            # تنظیم تونل GRE6
+            os.system(f"sudo ip tunnel add {tunnel_name} mode gre remote {remote_ip} local {local_ip} ttl 255")
+            os.system(f"sudo ip addr add {local_ip}/30 dev {tunnel_name}")
+            os.system(f"sudo ip link set {tunnel_name} up")
+            
+            show_message(f"Tunnel {tunnel_name} configured between {local_ip} and {remote_ip}.", "success")
+            logging.info(f"Tunnel {tunnel_name} configured between {local_ip} and {remote_ip}.")
+        except Exception as e:
+            logging.error(f"Failed to configure GRE6 tunnel: {e}")
+            show_message(f"Error: {e}", "error")
+    
+    else:
+        show_message(f"Unsupported tunnel type: {tunnel_type}", "error")
 
 # Delete a tunnel
 def delete_tunnel(tunnel_name):
@@ -139,15 +148,7 @@ def main():
             display_status_rich(servers)
         elif choice == "2":
             show_message("Configuring Tunnel...", "info")
-            print("\nAvailable Servers:")
-            for i, server in enumerate(servers, start=1):
-                print(f"{i}. {server['name']} ({server['tunnel_type']})")
-            server_choice = int(input("Select a server: ")) - 1
-            if 0 <= server_choice < len(servers):
-                local_tunnel = input("Enter a name for the local tunnel interface: ").strip()
-                setup_tunnel(servers[server_choice], local_tunnel)
-            else:
-                show_message("Invalid choice!", "error")
+            setup_tunnel_interactive(servers)
         elif choice == "3":
             tunnel_name = input("Enter the tunnel name to delete: ").strip()
             delete_tunnel(tunnel_name)
