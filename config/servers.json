@@ -1,0 +1,5 @@
+[
+    {"name": "Server 1", "remote_ip": "192.168.1.1", "tunnel_type": "6TO4"},
+    {"name": "Server 2", "remote_ip": "198.51.100.2", "tunnel_type": "GRE6"},
+    {"name": "Server 3", "remote_ip": "203.0.113.3", "tunnel_type": "IP6IP6"}
+]
