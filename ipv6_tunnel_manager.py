@@ -66,12 +66,13 @@ def show_message(message, message_type="info"):
 def setup_tunnel(server, local_tunnel):
     tunnel_type = server["tunnel_type"]
     remote_ip = server["remote_ip"]
+    local_ip = input("Enter the local IP for this server: ").strip()
     
     try:
         if tunnel_type == "6TO4":
             os.system(f"sudo ip tunnel add {local_tunnel} mode sit remote {remote_ip} ttl 255")
         elif tunnel_type == "GRE6":
-            os.system(f"sudo ip tunnel add {local_tunnel} mode gre6 remote {remote_ip} ttl 255")
+            os.system(f"sudo ip tunnel add {local_tunnel} mode gre remote {remote_ip} local {local_ip} ttl 255")
         elif tunnel_type == "IP6IP6":
             os.system(f"sudo ip tunnel add {local_tunnel} mode ip6ip6 remote {remote_ip} ttl 255")
         elif tunnel_type == "ANYCAST":
@@ -80,9 +81,12 @@ def setup_tunnel(server, local_tunnel):
             print(f"Unsupported tunnel type: {tunnel_type}")
             return
 
+        # تنظیم IP برای اینترفیس تونل
+        os.system(f"sudo ip addr add {local_ip}/30 dev {local_tunnel}")
         os.system(f"sudo ip link set {local_tunnel} up")
-        show_message(f"Tunnel {local_tunnel} configured for server {server['name']}", "success")
-        logging.info(f"Tunnel {local_tunnel} configured for server {server['name']}.")
+        
+        show_message(f"Tunnel {local_tunnel} configured for server {server['name']} with local IP {local_ip}.", "success")
+        logging.info(f"Tunnel {local_tunnel} configured for server {server['name']} with local IP {local_ip}.")
     except Exception as e:
         logging.error(f"Failed to configure tunnel: {e}")
         show_message(f"Error: {e}", "error")
